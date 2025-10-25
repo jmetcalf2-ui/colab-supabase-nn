@@ -8,3 +8,6 @@ seaborn
 torch
 torchvision
 torchaudio
+
+streamlit
+openai
