@@ -3,10 +3,16 @@ import pandas as pd
 import streamlit as st
 from supabase import create_client
 import joblib
+import openai
 
-# Load environment variables for Supabase
+# Load environment variables for Supabase and OpenAI
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Initialize OpenAI
+if OPENAI_API_KEY:
+    openai.api_key = OPENAI_API_KEY
 
 @st.cache_data(show_spinner=False)
 def init_supabase():
@@ -65,13 +71,41 @@ def render_ai_tab():
         prediction = model.predict(input_df)[0]
         st.success(f"Predicted primary role: {prediction}")
 
+def render_chat_tab():
+    st.header("AI Chat")
+    if not OPENAI_API_KEY:
+        st.write("OpenAI API key is not set. Please set OPENAI_API_KEY environment variable.")
+        return
+    # Initialize session state for messages
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    # Display messages
+    for msg in st.session_state.messages:
+        role = "You" if msg["role"] == "user" else "AI"
+        st.markdown(f"**{role}:** {msg['content']}")
+    user_text = st.text_input("Your message:", "")
+    if st.button("Send"):
+        if user_text:
+            st.session_state.messages.append({"role": "user", "content": user_text})
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=st.session_state.messages
+                )
+                reply = response.choices[0].message["content"].strip()
+                st.session_state.messages.append({"role": "assistant", "content": reply})
+            except Exception as e:
+                st.write("Error contacting OpenAI API: " + str(e))
+
 def main():
-    st.title("Supabase Leads Dashboard & AI Prediction")
-    tab1, tab2 = st.tabs(["Leads Dashboard", "AI Prediction"])
-    with tab1:
+    st.title("Supabase Leads Dashboard & AI Prediction/Chat")
+    tabs = st.tabs(["Leads Dashboard", "AI Prediction", "AI Chat"])
+    with tabs[0]:
         render_dashboard()
-    with tab2:
+    with tabs[1]:
         render_ai_tab()
+    with tabs[2]:
+        render_chat_tab()
 
 if __name__ == "__main__":
     main()
